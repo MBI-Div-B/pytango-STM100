@@ -1,6 +1,6 @@
-import pyvisa
 import logging
 from math import nan
+import pyvisa
 
 
 class STM100:
@@ -26,7 +26,7 @@ class STM100:
     @property
     def model(self):
         """Returns controller model and software revision."""
-        return self.query('@')
+        return self.query("@")
 
     @property
     def testmode(self):
@@ -39,13 +39,13 @@ class STM100:
 
     @testmode.setter
     def testmode(self, enable: bool):
-        c = '!' if enable else '@'
+        c = "!" if enable else "@"
         self.query(f"K{c}")
 
     @property
     def thickness(self):
         """Returns thickness (in Angstrom) of the current film."""
-        return self._query_float('S')
+        return self._query_float("S")
 
     @property
     def setpoint(self):
@@ -54,17 +54,17 @@ class STM100:
 
     @setpoint.setter
     def setpoint(self, value):
-        assert (value >=0) and (value <= 9999999), "Setpoint out of range"
+        assert (value >= 0) and (value <= 9999999), "Setpoint out of range"
         self.query(f"G={int(value):d}")
 
     @property
     def setpoint_reached(self):
-        return self._query_bool('P')
+        return self._query_bool("P")
 
     @property
     def rate(self):
         """Returns current deposition rate in Angstrom/s."""
-        return self._query_float('T')
+        return self._query_float("T")
 
     @property
     def density(self):
@@ -98,25 +98,25 @@ class STM100:
     @property
     def frequency(self):
         """Returns quartz crystal frequency (Hz)."""
-        return self._query_float('U')
+        return self._query_float("U")
 
     @property
     def lifetime(self):
         """Returns remaining quartz crystal lifetime in percent."""
-        return self._query_float('V')
+        return self._query_float("V")
 
     @property
     def crystal_fail(self):
         """Returns whether quartz crystal has failed."""
-        return self._query_bool('M')
+        return self._query_bool("M")
 
     @property
     def timer(self):
         """Timer value in seconds. Returns nan if greater than 99:59"""
-        ans = self.query('W')
-        if ans[0] == '>':
+        ans = self.query("W")
+        if ans[0] == ">":
             return nan
-        minutes, seconds = ans.split(':')
+        minutes, seconds = ans.split(":")
         return 60 * int(minutes) + int(seconds)
 
     @property
@@ -133,7 +133,7 @@ class STM100:
 
     @shutter.setter
     def shutter(self, enable: bool):
-        v = '!' if enable else '@'
+        v = "!" if enable else "@"
         self.query(f"A{v}")
 
     @property
@@ -145,12 +145,12 @@ class STM100:
         - brownout occurred
         - non-volatile memory fault
         """
-        ans = ord(self.query('a'))
+        ans = ord(self.query("a"))
         return [bool(ans & i) for i in [1, 2, 4]]
 
     def reset_poweron_status(self):
         """Send power-on status acknowledgement and reset status bits."""
-        self.query('L')
+        self.query("L")
 
     def zero(self, what="both"):
         """Zeros the timer and/or thickness.
@@ -160,18 +160,18 @@ class STM100:
         what: "both", "timer", "thickness"
         """
         if what == "both":
-            cmd = 'B'
+            cmd = "B"
         elif what == "thickness":
-            cmd = 'C'
+            cmd = "C"
         elif what == "timer":
-            cmd = 'D'
+            cmd = "D"
         else:
             raise ValueError("Parameter 'what' needs to be both/thickness/timer")
         self.query(cmd)
 
     def query_films(self):
         """Queries all saved film parameters."""
-        params = dict(density='j', zfactor='k', tooling='o')
+        params = dict(density="j", zfactor="k", tooling="o")
         self._films = []
         for f in range(1, 10):
             self._films.append(
@@ -189,7 +189,7 @@ class STM100:
         """Query command that returns boolean reply, i.e., '@' or '!' character"""
         ans = self.query(cmd)
         assert ans in "!@", f"Unexpected response to query ({cmd})"
-        return ans == '!'
+        return ans == "!"
 
     def _calc_checksum(self, msg):
         return sum(ord(c) for c in msg) % 256
@@ -199,19 +199,18 @@ class STM100:
             raise ValueError("maximum message length is 10!")
         chksum = self._calc_checksum(msg)
         cmd = bytes([2, len(msg)] + [ord(c) for c in msg] + [chksum])
-        self.log.debug(f"Send command: {msg} ({cmd})")
+        self.log.debug("Send command: %s (%s)", msg, cmd)
         return self.inst.write_raw(cmd)
 
     def _read(self):
         s = self.inst.read_bytes(1).decode()
-        if s == '\x02':
+        if s == "\x02":
             msgsize = ord(self.inst.read_bytes(1))
             msg = self.inst.read_bytes(msgsize).decode()
             chksum = ord(self.inst.read_bytes(1))
             msg_ok = chksum == self._calc_checksum(msg)
             if not msg_ok:
                 self.log.error("Checksum mismatch")
-                pass
             return msg[0], msg[1:]
         else:
             error_msg = "Received message without start byte"
@@ -235,7 +234,7 @@ class STM100:
         Returns
         =======
         reply: str
-            
+
         """
         self._send(msg)
         ret, ans = self._read()
@@ -246,4 +245,3 @@ class STM100:
         """Close pyvisa session."""
         self.inst.close()
         self.rm.close()
-
